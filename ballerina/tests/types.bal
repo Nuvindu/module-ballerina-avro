@@ -36,7 +36,24 @@ public type Instructor record {
 
 public type Lecturer record {
     string? name;
-    Instructor instructor;
+    Instructor & readonly instructor;
+};
+
+public type Lecturer2 record {
+    string? name;
+    int age;
+    Instructor & readonly instructor;
+};
+
+public type Lecturer3 readonly & record {
+    map<int> & readonly name;
+    int age;
+    Instructor & readonly instructor;
+};
+
+public type Lecturer1 readonly & record {
+    string? name;
+    Instructor & readonly instructor;
 };
 
 public type Color record {
