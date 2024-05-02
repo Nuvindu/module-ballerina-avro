@@ -20,6 +20,5 @@ module io.ballerina.stdlib.serdes {
     requires io.ballerina.runtime;
     requires io.ballerina.lang;
     requires com.fasterxml.jackson.databind;
-    requires com.fasterxml.jackson.dataformat.avro;
-    requires avro;
+    requires org.apache.avro;
 }

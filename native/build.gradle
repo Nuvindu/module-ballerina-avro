@@ -30,8 +30,7 @@ dependencies {
 
     implementation group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-runtime', version: "${ballerinaLangVersion}"
-    implementation group: 'org.apache.avro', name: 'avro', version: "${avroJacksonVersion}"
-    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-avro', version: "${jacksonVersion}"
+    implementation group: 'org.apache.avro', name: 'avro', version: "${avroVersion}"
 }
 
 checkstyle {
