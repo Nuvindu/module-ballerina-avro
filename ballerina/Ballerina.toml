@@ -19,7 +19,7 @@ graalvmCompatible = true
 groupId = "io.ballerina.lib"
 artifactId = "avro-native"
 version = "0.1.2"
-path = "../native/build/libs/avro-native-0.1.2-SNAPSHOT.jar"
+path = "../native/build/libs/avro-native-0.1.2.jar"
 
 [[platform.java17.dependency]]
 groupId = "org.apache.avro"
