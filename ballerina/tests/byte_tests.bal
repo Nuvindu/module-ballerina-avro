@@ -35,3 +35,22 @@ public isolated function testByteArrays() returns error? {
     byte[][] deserializeJson = check avro.fromAvro(encode);
     test:assertEquals(deserializeJson, numbers);
 }
+
+@test:Config {
+    groups: ["primitive", "bytes", "q"]
+}
+public isolated function testBytes() returns error? {
+    string schema = string `
+        {
+            "type": "bytes",
+            "name" : "byteValue", 
+            "namespace": "data"
+        }`;
+
+    byte[] value = "5".toBytes();
+
+    Schema avro = check new (schema);
+    byte[] encode = check avro.toAvro(value);
+    byte[] deserializeJson = check avro.fromAvro(encode);
+    test:assertEquals(deserializeJson, value);
+}
