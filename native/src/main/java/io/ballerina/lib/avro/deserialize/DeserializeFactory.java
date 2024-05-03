@@ -32,6 +32,7 @@ public class DeserializeFactory {
             case FIXED -> new FixedDeserializer();
             case MAP -> new MapDeserializer(type);
             case RECORD -> new RecordDeserializer(schema, type);
+            case BYTES -> new ByteDeserializer();
             default -> new GenericDeserializer();
         };
     }

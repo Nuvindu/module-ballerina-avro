@@ -31,6 +31,7 @@ public class MessageFactory {
             case ENUM -> new EnumSerializer(schema);
             case MAP -> new MapSerializer(schema);
             case RECORD -> new RecordSerializer(schema);
+            case BYTES -> new ByteSerializer();
             default -> new GenericSerializer();
         };
     }
