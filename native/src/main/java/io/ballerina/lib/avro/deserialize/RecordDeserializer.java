@@ -30,7 +30,7 @@ public class RecordDeserializer extends Deserializer {
     }
 
     @Override
-    public Object fromAvroMessage(DeserializeVisitor visitor, Object data) throws Exception {
+    public Object fromAvroMessage(DeserializeVisitor visitor, Object data, Schema schema) throws Exception {
         return visitor.visitRecords(getType(), getSchema(), (GenericRecord) data);
     }
 }

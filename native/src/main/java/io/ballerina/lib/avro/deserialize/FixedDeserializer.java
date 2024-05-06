@@ -19,11 +19,12 @@
 package io.ballerina.lib.avro.deserialize;
 
 import io.ballerina.lib.avro.visitor.DeserializeVisitor;
+import org.apache.avro.Schema;
 
 public class FixedDeserializer extends Deserializer {
 
     @Override
-    public Object fromAvroMessage(DeserializeVisitor visitor, Object data) {
+    public Object fromAvroMessage(DeserializeVisitor visitor, Object data, Schema schema) {
         return visitor.visitFixed(data);
     }
 }
