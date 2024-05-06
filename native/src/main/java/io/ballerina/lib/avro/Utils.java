@@ -19,11 +19,13 @@
 package io.ballerina.lib.avro;
 
 import io.ballerina.runtime.api.creators.ErrorCreator;
+import io.ballerina.runtime.api.types.IntersectionType;
+import io.ballerina.runtime.api.types.MapType;
+import io.ballerina.runtime.api.types.Type;
+import io.ballerina.runtime.api.types.UnionType;
 import io.ballerina.runtime.api.utils.StringUtils;
+import io.ballerina.runtime.api.utils.TypeUtils;
 import io.ballerina.runtime.api.values.BError;
-import org.apache.avro.Schema;
-
-import java.util.List;
 
 import static io.ballerina.lib.avro.ModuleUtils.getModule;
 
@@ -41,20 +43,27 @@ public final class Utils {
     public static final String MAP_TYPE = "BMapType";
     public static final String RECORD_TYPE = "BRecordType";
     public static final String INTEGER_TYPE = "BIntegerType";
+    public static final String FLOAT_TYPE = "BFloatType";
 
     public static BError createError(String message, Throwable throwable) {
         BError cause = ErrorCreator.createError(throwable);
         return ErrorCreator.createError(getModule(), ERROR_TYPE, StringUtils.fromString(message), cause, null);
     }
 
-    public static Schema checkType(Schema.Type givenType, List<Schema> schemas) {
-        for (Schema schema: schemas) {
-            if (schema.getType().equals(Schema.Type.UNION)) {
-                checkType(givenType, schema.getTypes());
-            } else if (schema.getType().equals(givenType)) {
-                return schema;
+    public static Type getMutableType(IntersectionType intersectionType) {
+        for (Type type : intersectionType.getConstituentTypes()) {
+            Type referredType = TypeUtils.getImpliedType(type);
+            if (referredType instanceof UnionType) {
+                for (Type elementType : ((UnionType) referredType).getMemberTypes()) {
+                    if (elementType instanceof MapType) {
+                        return elementType;
+                    }
+                }
+            }
+            if (TypeUtils.getImpliedType(intersectionType.getEffectiveType()).getTag() == referredType.getTag()) {
+                return referredType;
             }
         }
-        return null;
+        throw new IllegalStateException("Unsupported intersection type found: " + intersectionType);
     }
 }
