@@ -128,7 +128,7 @@ public isolated function testBoolean() returns error? {
 }
 
 @test:Config {
-    groups: ["primitive", "check", "null"]
+    groups: ["primitive", "null"]
 }
 public isolated function testNullValues() returns error? {
     string schema = string `
@@ -145,7 +145,7 @@ public isolated function testNullValues() returns error? {
 }
 
 @test:Config {
-    groups: ["primitive", "check", "nulls"]
+    groups: ["primitive", "null"]
 }
 public isolated function testNullValuesWithNonNullData() returns error? {
     string schema = string `

@@ -18,106 +18,6 @@ import ballerina/io;
 import ballerina/test;
 
 @test:Config {
-    groups: ["array", "string"]
-}
-public isolated function testStringArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "stringArray", 
-            "namespace": "data", 
-            "items": "string"
-        }`;
-
-    string[] colors = ["red", "green", "blue"];
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(colors);
-    string[] deserializeJson = check avro.fromAvro(encode);
-    test:assertEquals(deserializeJson, colors);
-}
-
-@test:Config {
-    groups: ["array", "float"]
-}
-public isolated function testFloatArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "floatArray", 
-            "namespace": "data", 
-            "items": "float"
-        }`;
-
-    float[] numbers = [22.4, 556.84350, 78.0327];
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(numbers);
-    float[] deserializeJson = check avro.fromAvro(encode);
-    test:assertEquals(deserializeJson, numbers);
-}
-
-@test:Config {
-    groups: ["array", "double"]
-}
-public isolated function testDoubleArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "doubleArray", 
-            "namespace": "data", 
-            "items": "double"
-        }`;
-
-    float[] numbers = [22.439475948, 556.843549485340, 78.032985693457];
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(numbers);
-    float[] deserializeJson = check avro.fromAvro(encode);
-    test:assertEquals(deserializeJson, numbers);
-}
-
-@test:Config {
-    groups: ["array", "errors"]
-}
-public isolated function testInvalidDecimalArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "decimalArray", 
-            "namespace": "data", 
-            "items": "double"
-        }`;
-
-    decimal[] numbers = [22.439475948, 556.843549485340, 78.032985693457];
-
-    Schema avro = check new (schema);
-    byte[]|Error encode = avro.toAvro(numbers);
-    io:println(encode);
-    test:assertTrue(encode is Error);
-}
-
-@test:Config {
-    groups: ["array", "boolean"]
-}
-public isolated function testBooleanArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "booleanArray", 
-            "namespace": "data", 
-            "items": "boolean"
-        }`;
-
-    boolean[] numbers = [true, true, false];
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(numbers);
-    boolean[] deserializeJson = check avro.fromAvro(encode);
-    test:assertEquals(deserializeJson, numbers);
-}
-
-@test:Config {
     groups: ["enum"]
 }
 public isolated function testEnums() returns error? {
@@ -157,65 +57,7 @@ public isolated function testEnumsWithString() returns error? {
 }
 
 @test:Config {
-    groups: ["maps"]
-}
-public isolated function testMaps() returns error? {
-    string schema = string `
-        {
-            "type": "map",
-            "values" : "int",
-            "default": {}
-        }`;
-
-    map<int> colors = {"red": 0, "green": 1, "blue": 2};
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(colors);
-    map<int> deserialize = check avro.fromAvro(encode);
-    test:assertEquals(colors, deserialize);
-}
-
-@test:Config {
-    groups: ["record", "array"]
-}
-public isolated function testRecordsInArrays() returns error? {
-    string schema = string `
-        {
-            "type": "array",
-            "name" : "recordArray", 
-            "namespace": "data", 
-            "items": {
-                "type": "record",
-                "name": "Student",
-                "fields": [
-                    {
-                        "name": "name",
-                        "type": ["string", "null"]
-                    },
-                    {
-                        "name": "subject",
-                        "type": ["string", "null"]
-                    }
-                ]
-            }
-        }`;
-
-    Student[] students = [{
-        name: "Liam",
-        subject: "geology"
-    }, {
-        name: "John",
-        subject: "math"
-    }];
-
-    Schema avro = check new (schema);
-    byte[] encode = check avro.toAvro(students);
-    Student[] deserializeJson = check avro.fromAvro(encode);
-    test:assertEquals(deserializeJson, students);
-}
-
-@test:Config {
-    groups: ["check", "fixed"]
+    groups: ["fixed"]
 }
 public isolated function testFixed() returns error? {
     string schema = string `
@@ -231,6 +73,24 @@ public isolated function testFixed() returns error? {
     byte[] encode = check avro.toAvro(value);
     byte[] deserialize = check avro.fromAvro(encode);
     test:assertEquals(deserialize, value);
+}
+
+@test:Config {
+    groups: ["fixed"]
+}
+public isolated function testFixedWithInvalidSize() returns error? {
+    string schema = string `
+        {
+            "type": "fixed",
+            "name": "name",
+            "size": 16
+        }`;
+
+    byte[] value = "u00".toBytes();
+
+    Schema avro = check new (schema);
+    byte[]|Error encode = avro.toAvro(value);
+    test:assertTrue(encode is Error);
 }
 
 @test:Config {

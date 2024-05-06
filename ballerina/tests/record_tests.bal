@@ -16,18 +16,8 @@
 
 import ballerina/test;
 
-type Stud record {
-    string name;
-    float age;
-};
-
-public type Student1 record {
-    string name;
-    byte[] favorite_color;
-};
-
 @test:Config {
-    groups: ["check", "qww"]
+    groups: ["record"]
 }
 public isolated function testRecords() returns error? {
     string schema = string `
@@ -52,34 +42,8 @@ public isolated function testRecords() returns error? {
     test:assertEquals(student, deserialize);
 }
 
-@test:Config{
-    groups: ["avro", "check", "t"]
-}
-public isolated function testAvroSerDes() returns error? {
-    string schema = string `
-        {
-            "namespace": "example.avro",
-            "type": "record",
-            "name": "Student",
-            "fields": [
-                {"name": "name", "type": "string"},
-                {"name": "favorite_color", "type": "bytes"}
-            ]
-        }`;
-
-    Student1 student = {
-        name: "Liam",
-        favorite_color: "yellow".toBytes()
-    };
-
-    Schema avro = check new(schema);
-    byte[] encode = check avro.toAvro(student);
-    Student1 deserialize = check avro.fromAvro(encode);
-    test:assertEquals(deserialize, student);
-}
-
 @test:Config {
-    groups: ["check", "recs", "s"]
+    groups: ["record"]
 }
 public isolated function testRecordsWithDifferentTypeOfFields() returns error? {
     string schema = string `
@@ -105,7 +69,7 @@ public isolated function testRecordsWithDifferentTypeOfFields() returns error? {
 }
 
 @test:Config {
-    groups: ["primitive", "nest", "check", "read"]
+    groups: ["record"]
 }
 public isolated function testNestedRecords() returns error? {
     string schema = string `
@@ -179,7 +143,7 @@ public isolated function testNestedRecords() returns error? {
 }
 
 @test:Config {
-    groups: ["nest", "check", "z"]
+    groups: ["record", "array"]
 }
 public isolated function testArraysInRecords() returns error? {
     string schema = string `
@@ -210,7 +174,7 @@ type Color1 record {
 };
 
 @test:Config {
-    groups: ["errors", "qwe", "check"]
+    groups: ["record", "errors"]
 }
 public isolated function testArraysInRecordsWithInvalidSchema() returns error? {
     string schema = string `
@@ -246,20 +210,8 @@ public isolated function testArraysInRecordsWithInvalidSchema() returns error? {
     test:assertTrue(deserialize is Error);
 }
 
-type UnionRec record {
-    string? name;
-    int? credits;
-    float gg;
-    Stu? student;
-};
-
-type Stu record {
-    string? name;
-    string? subject;
-};
-
 @test:Config {
-    groups: ["check", "unions"]
+    groups: ["record", "union"]
 }
 public isolated function testRecordsWithUnionTypes() returns error? {
     string schema = string `
@@ -273,7 +225,7 @@ public isolated function testRecordsWithUnionTypes() returns error? {
                     "type": ["string", "null"]
                 },
                 {
-                    "name": "gg",
+                    "name": "value",
                     "type": "float"
                 },
                 {
@@ -300,21 +252,47 @@ public isolated function testRecordsWithUnionTypes() returns error? {
             ]
         }`;
 
-    UnionRec course = {
+    UnionRecord course = {
         name: "data",
-        gg: 0.0,
+        value: 0.0,
         credits: 5,
         student: {name: "Jon", subject: "geo"}
     };
 
     Schema avro = check new (schema);
     byte[] serialize = check avro.toAvro(course);
-    UnionRec deserialize = check avro.fromAvro(serialize);
+    UnionRecord deserialize = check avro.fromAvro(serialize);
     test:assertEquals(deserialize, course);
 }
 
 @test:Config {
-    groups: ["check", "recs", "s"]
+    groups: ["record", "primitive", "int"]
+}
+public isolated function testRecordsWithIntFields() returns error? {
+    string schema = string `
+        {
+            "namespace": "example.avro",
+            "type": "record",
+            "name": "Student",
+            "fields": [
+                {"name": "name", "type": "string"},
+                {"name": "age", "type": "int"}
+            ]
+        }`;
+
+    Person student = {
+        name: "Liam",
+        age: 52
+    };
+
+    Schema avro = check new (schema);
+    byte[] encode = check avro.toAvro(student);
+    Person deserialize = check avro.fromAvro(encode);
+    test:assertEquals(student, deserialize);
+}
+
+@test:Config {
+    groups: ["record", "primitive", "long"]
 }
 public isolated function testRecordsWithLongFields() returns error? {
     string schema = string `
@@ -340,7 +318,7 @@ public isolated function testRecordsWithLongFields() returns error? {
 }
 
 @test:Config {
-    groups: ["check", "recs", "sss"]
+    groups: ["record", "primitive", "float"]
 }
 public isolated function testRecordsWithFloatFields() returns error? {
     string schema = string `
@@ -354,19 +332,19 @@ public isolated function testRecordsWithFloatFields() returns error? {
             ]
         }`;
 
-    Stud student = {
+    Students student = {
         name: "Liam",
         age: 52.656
     };
 
     Schema avro = check new (schema);
     byte[] encode = check avro.toAvro(student);
-    Stud deserialize = check avro.fromAvro(encode);
+    Students deserialize = check avro.fromAvro(encode);
     test:assertEquals(student, deserialize);
 }
 
 @test:Config {
-    groups: ["check", "recs", "s"]
+    groups: ["record", "primitive", "double"]
 }
 public isolated function testRecordsWithDoubleFields() returns error? {
     string schema = string `
@@ -380,13 +358,257 @@ public isolated function testRecordsWithDoubleFields() returns error? {
             ]
         }`;
 
-    Stud student = {
+    Students student = {
         name: "Liam",
         age: 52.656
     };
 
     Schema avro = check new (schema);
     byte[] encode = check avro.toAvro(student);
-    Stud deserialize = check avro.fromAvro(encode);
+    Students deserialize = check avro.fromAvro(encode);
     test:assertEquals(student, deserialize);
+}
+
+@test:Config {
+    groups: ["record", "primitive", "boolean"]
+}
+public isolated function testRecordsWithBooleanFields() returns error? {
+    string schema = string `
+        {
+            "namespace": "example.avro",
+            "type": "record",
+            "name": "Student",
+            "fields": [
+                {"name": "name", "type": "string"},
+                {"name": "under19", "type": "boolean"}
+            ]
+        }`;
+
+    StudentRec student = {
+        name: "Liam",
+        under19: false
+    };
+
+    Schema avro = check new (schema);
+    byte[] encode = check avro.toAvro(student);
+    StudentRec deserialize = check avro.fromAvro(encode);
+    test:assertEquals(student, deserialize);
+}
+
+@test:Config {
+    groups: ["record", "union"]
+}
+public isolated function testOptionalValuesInRecords() returns error? {
+    string schema = string `
+    {
+        "type": "record",
+        "name": "Lecturer5",
+        "fields": [
+            {
+                "name": "name",
+                "type": [
+                    "null", 
+                    {
+                        "type": "map",
+                        "values": "int"
+                    }
+                ]
+            },
+            {
+                "name": "bytes",
+                "type": ["null", "bytes"]
+            },
+            {
+                "name": "instructorClone",
+                "type": ["null", {
+                    "type": "record",
+                    "name": "Instructor",
+                    "fields": [
+                    {
+                        "name": "name",
+                        "type": ["null", "string"]
+                    },
+                    {
+                        "name": "student",
+                        "type": ["null", {
+                        "type": "record",
+                        "name": "Student",
+                        "fields": [
+                            {
+                            "name": "name",
+                            "type": "string"
+                            },
+                            {
+                            "name": "subject",
+                            "type": "string"
+                            }
+                        ]
+                        }]
+                    }
+                    ]
+                }]
+            },
+            {
+                "name": "instructors",
+                "type": ["null", "Instructor"]
+            }
+        ]
+    }`;
+
+    Instructor instructor = {
+        name: "John",
+        student: {
+            name: "Alice",
+            subject: "Math"
+        }
+    };
+
+    Lecturer5 lecturer5 = {
+        name: {
+            "John": 1, 
+            "Sam": 2, 
+            "Liam": 3
+        },
+        bytes: "ss".toBytes(),
+        instructorClone: instructor.cloneReadOnly(),
+        instructors: instructor
+    };
+
+    Schema avro = check new (schema);
+    byte[] serialize = check avro.toAvro(lecturer5);
+    Lecturer5 deserialize = check avro.fromAvro(serialize);
+    test:assertEquals(deserialize, lecturer5);
+}
+
+@test:Config {
+    groups: ["record", "union"]
+}
+public isolated function testOptionalMultipleFieldsInRecords() returns error? {
+    string schema = string `
+    {
+        "type": "record",
+        "name": "Lecturer6",
+        "fields": [
+            {
+                "name": "temporary",
+                "type": ["null", "boolean"]
+            },
+            {
+                "name": "maps",
+                "type": [
+                    "null", 
+                    {
+                        "type": "map",
+                        "values": "int"
+                    }
+                ]
+            },
+            {
+                "name": "number",
+                "type": [
+                    "null",
+                    {
+                        "type": "enum",
+                        "name": "Numbers",
+                        "symbols": [ "ONE", "TWO", "THREE", "FOUR" ]
+                    }
+                ]
+            },
+            {
+                "name": "bytes",
+                "type": ["null", {
+                    "type": "fixed",
+                    "name": "FixedBytes",
+                    "size": 2
+                }]
+            },
+            {
+                "name": "age",
+                "type": ["null", "long"]
+            },
+            {
+                "name": "name",
+                "type": ["null", "string"]
+            },
+            {
+                "name": "floatNumber",
+                "type": ["null", "float"]
+            },
+            {
+                "name": "colors",
+                "type": ["null", {
+                    "type": "array",
+                    "items": {
+                        "type": "enum",
+                        "name": "ColorEnum",
+                        "symbols": ["ONE", "TWO", "THREE"]
+                    }
+                }]
+            },
+            {
+                "name": "instructorClone",
+                "type": ["null", {
+                    "type": "record",
+                    "name": "Instructor",
+                    "fields": [
+                    {
+                        "name": "name",
+                        "type": ["null", "string"]
+                    },
+                    {
+                        "name": "student",
+                        "type": ["null", {
+                            "type": "record",
+                            "name": "Student",
+                            "fields": [
+                                {
+                                "name": "name",
+                                "type": "string"
+                                },
+                                {
+                                "name": "subject",
+                                "type": "string"
+                                }
+                            ]
+                        }]
+                    }]
+                }]
+            },
+            {
+                "name": "instructors",
+                "type": ["null", "Instructor"]
+            }
+        ]
+    }`;
+
+    Instructor instructor = {
+        name: "John",
+        student: {
+            name: "Alice",
+            subject: "Math"
+        }
+    };
+
+    Numbers number = ONE;
+
+    Lecturer6 lecturer6 = {
+        temporary: false,
+        maps: {
+            "1": 100,
+            "2": 200
+        },
+        bytes: "ss".toBytes(),
+        age: 30,
+        number: number,
+        name: "Lecturer Name",
+        floatNumber: 123.45,
+        colors: [number, number, number],
+        instructorClone: instructor.cloneReadOnly(),
+        instructors: instructor
+    };
+
+    Schema avro = check new (schema);
+    byte[] serialize = check avro.toAvro(lecturer6);
+    Lecturer6 deserialize = check avro.fromAvro(serialize);
+    test:assertEquals(deserialize, lecturer6);
 }

@@ -16,10 +16,36 @@
 
 import ballerina/test;
 
+@test:Config{
+    groups: ["record", "bytes"]
+}
+public isolated function testRecordsWithBytes() returns error? {
+    string schema = string `
+        {
+            "namespace": "example.avro",
+            "type": "record",
+            "name": "Student",
+            "fields": [
+                {"name": "name", "type": "string"},
+                {"name": "favorite_color", "type": "bytes"}
+            ]
+        }`;
+
+    Student1 student = {
+        name: "Liam",
+        favorite_color: "yellow".toBytes()
+    };
+
+    Schema avro = check new(schema);
+    byte[] encode = check avro.toAvro(student);
+    Student1 deserialize = check avro.fromAvro(encode);
+    test:assertEquals(deserialize, student);
+}
+
 @test:Config {
     groups: ["array", "byte"]
 }
-public isolated function testByteArrays() returns error? {
+public isolated function testArraysWithBytes() returns error? {
     string schema = string `
         {
             "type": "array",
@@ -37,7 +63,7 @@ public isolated function testByteArrays() returns error? {
 }
 
 @test:Config {
-    groups: ["primitive", "bytes", "q"]
+    groups: ["primitive", "bytes"]
 }
 public isolated function testBytes() returns error? {
     string schema = string `
@@ -53,4 +79,59 @@ public isolated function testBytes() returns error? {
     byte[] encode = check avro.toAvro(value);
     byte[] deserializeJson = check avro.fromAvro(encode);
     test:assertEquals(deserializeJson, value);
+}
+
+@test:Config {
+    groups: ["record", "maps", "bytes"]
+}
+public isolated function testNestedRecordsWithBytes() returns error? {
+    string schema = string `
+    {
+        "type": "record",
+        "name": "Lecturer4",
+        "fields": [
+            {
+                "name": "name",
+                "type": {
+                    "type": "map",
+                    "values": "int"
+                }
+            },
+            {
+                "name": "byteData",
+                "type": "bytes"
+            },
+            {
+                "name": "instructor",
+                "type": {
+                    "type": "record",
+                    "name": "ByteRecord",
+                    "fields": [
+                        {
+                            "name": "byteData",
+                            "type": "bytes"
+                        }
+                    ]
+                }
+            }
+        ]
+    }`;
+
+    Lecturer4 lecturer4 = {
+        name: {
+            "John": 1, 
+            "Sam": 2, 
+            "Liam": 3
+        },
+        byteData: "s".toBytes().cloneReadOnly(),
+        instructor: {
+            byteData: "ddd".toBytes().cloneReadOnly()
+        }
+    };
+
+    Schema avro = check new (schema);
+    byte[] serialize = check avro.toAvro(lecturer4);
+    Lecturer4 deserialize = check avro.fromAvro(serialize);
+    // deserialize.instructor.student.name = "Sam";
+    test:assertEquals(deserialize, lecturer4);
 }

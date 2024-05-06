@@ -19,6 +19,21 @@ public type Student record {
     string subject;
 };
 
+public type Student1 record {
+    string name;
+    byte[] favorite_color;
+};
+
+type Students record {
+    string name;
+    float age;
+};
+
+type StudentRec record {
+    string name;
+    boolean under19;
+};
+
 public type Person record {
     string name;
     int age;
@@ -31,10 +46,15 @@ public type Course record {
 
 public type Instructor record {
     string? name;
-    Student student;
+    Student? student;
 };
 
 public type Lecturer record {
+    string? name;
+    Instructor instructor;
+};
+
+public type Lecturer1 readonly & record {
     string? name;
     Instructor & readonly instructor;
 };
@@ -51,9 +71,46 @@ public type Lecturer3 readonly & record {
     Instructor & readonly instructor;
 };
 
-public type Lecturer1 readonly & record {
+public type Lecturer4 readonly & record {
+    map<int> & readonly name;
+    byte[] byteData;
+    ByteRecord? instructor;
+};
+
+public type Lecturer5 record {
+    map<int>? & readonly name;
+    byte[]? bytes;
+    Instructor? & readonly instructorClone;
+    Instructor? instructors;
+};
+
+public type Lecturer6 record {
+    boolean? temporary;
+    map<int>? & readonly maps;
+    byte[]? bytes;
+    int? age;
     string? name;
-    Instructor & readonly instructor;
+    Numbers? number;
+    float? floatNumber;
+    string[]? colors;
+    Instructor? & readonly instructorClone;
+    Instructor? instructors;
+};
+
+public type ByteRecord readonly & record {
+    byte[] byteData;
+};
+
+type UnionRecord record {
+    string? name;
+    int? credits;
+    float value;
+    StudentRecord? student;
+};
+
+type StudentRecord record {
+    string? name;
+    string? subject;
 };
 
 public type Color record {
