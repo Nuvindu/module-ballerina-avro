@@ -32,6 +32,9 @@ public interface ISerializeVisitor {
     GenericRecord visitRecord(BMap<?, ?> data, Schema schema) throws Exception;
     Map<String, Object> visitMap(BMap<?, ?> data, Schema schema) throws Exception;
     GenericData.Array<Object> visitArray(BArray data, Schema schema) throws Exception;
+
+    Object visitBytes(Object data, Schema schema);
+
     Object visitEnum(Object data, Schema schema);
     GenericData.Fixed visitFixed(Object data, Schema schema);
 }

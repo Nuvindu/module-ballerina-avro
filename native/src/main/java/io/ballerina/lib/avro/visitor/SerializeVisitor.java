@@ -26,20 +26,22 @@ import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BString;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import static io.ballerina.lib.avro.Utils.ARRAY_TYPE;
+import static io.ballerina.lib.avro.Utils.FLOAT_TYPE;
 import static io.ballerina.lib.avro.Utils.INTEGER_TYPE;
 import static io.ballerina.lib.avro.Utils.MAP_TYPE;
 import static io.ballerina.lib.avro.Utils.RECORD_TYPE;
 import static io.ballerina.lib.avro.Utils.STRING_TYPE;
-import static io.ballerina.lib.avro.Utils.checkType;
 
 public class SerializeVisitor implements ISerializeVisitor {
 
@@ -97,6 +99,13 @@ public class SerializeVisitor implements ISerializeVisitor {
     @Override
     public Map<String, Object> visitMap(BMap<?, ?> data, Schema schema) throws Exception {
         Map<String, Object> avroMap = new HashMap<>();
+        if (schema.getType().equals(Schema.Type.UNION)) {
+            for (Schema fieldSchema: schema.getTypes()) {
+                if (fieldSchema.getType().equals(Schema.Type.MAP)) {
+                    schema = fieldSchema;
+                }
+            }
+        }
         Schema.Type type = schema.getValueType().getType();
         for (Object value : data.getKeys()) {
             switch (type) {
@@ -110,6 +119,8 @@ public class SerializeVisitor implements ISerializeVisitor {
                         avroMap.put(value.toString(), visitArray((BArray) data.get(value), schema.getValueType()));
                 case ENUM ->
                         avroMap.put(value.toString(), visitEnum(data.get(value), schema.getValueType()));
+                case FIXED ->
+                        avroMap.put(value.toString(), visitFixed(data.get(value), schema.getValueType()));
                 default ->
                         throw new IllegalArgumentException("Unsupported schema type: " + type);
             }
@@ -117,6 +128,17 @@ public class SerializeVisitor implements ISerializeVisitor {
         return avroMap;
     }
 
+    @Override
+    public Object visitBytes(Object data, Schema schema) {
+        if (schema.getType().equals(Schema.Type.UNION)) {
+            for (Schema fieldSchema: schema.getTypes()) {
+                if (fieldSchema.getType().equals(Schema.Type.BYTES)) {
+                    return ByteBuffer.wrap(((BArray) data).getByteArray());
+                }
+            }
+        }
+        return ByteBuffer.wrap(((BArray) data).getByteArray());
+    }
     @Override
     public Object visitEnum(Object data, Schema schema) {
         return new GenericData.EnumSymbol(schema, data);
@@ -131,6 +153,30 @@ public class SerializeVisitor implements ISerializeVisitor {
     public GenericData.Array<Object> visitArray(BArray data, Schema schema) throws Exception {
         GenericData.Array<Object> array = new GenericData.Array<>(data.size(), schema);
         switch (schema.getElementType().getType()) {
+            case ARRAY -> {
+                Arrays.stream(data.getValues())
+                        .filter(Objects::nonNull)
+                        .forEach(value -> {
+                            try {
+                                array.add(visitArray((BArray) value, schema.getElementType()));
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                return array;
+            }
+            case ENUM -> {
+                Arrays.stream((data.getValues() == null) ? data.getStringArray() : data.getValues())
+                        .filter(Objects::nonNull)
+                        .forEach(value -> {
+                            try {
+                                array.add(new GenericData.EnumSymbol(schema.getElementType(), value));
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                return array;
+            }
             case STRING -> {
                 return visitStringArray(data, array);
             }
@@ -148,6 +194,9 @@ public class SerializeVisitor implements ISerializeVisitor {
             }
             case RECORD -> {
                 return visitRecordArray(data, schema, array);
+            }
+            case FIXED -> {
+                return visitFixed(data, array, schema.getElementType());
             }
             default -> {
                 return visitBytes(data, array);
@@ -195,6 +244,16 @@ public class SerializeVisitor implements ISerializeVisitor {
         return array;
     }
 
+    private GenericData.Array<Object> visitFixed(BArray data, GenericData.Array<Object> array, Schema schema) {
+        Arrays.stream(data.getValues())
+                .filter(Objects::nonNull)
+                .forEach(bytes -> {
+                    GenericFixed genericFixed = new GenericData.Fixed(schema, ((BArray) bytes).getByteArray());
+                    array.add(genericFixed);
+                });
+        return array;
+    }
+
     private GenericData.Array<Object> visitBooleanArray(BArray data, GenericData.Array<Object> array) {
         for (Object obj: data.getBooleanArray()) {
             array.add(obj);
@@ -229,16 +288,30 @@ public class SerializeVisitor implements ISerializeVisitor {
         Type typeName = TypeUtils.getType(data);
         switch (typeName.getClass().getSimpleName()) {
             case STRING_TYPE -> {
+                for (Schema schema : field.schema().getTypes()) {
+                    if (schema.getType().equals(Schema.Type.ENUM)) {
+                        return new GenericData.EnumSymbol(schema, data);
+                    }
+                }
                 return data.toString();
             }
             case ARRAY_TYPE -> {
+                for (Schema schema: field.schema().getTypes()) {
+                    if (schema.getType().equals(Schema.Type.BYTES)) {
+                        return ByteBuffer.wrap(((BArray) data).getByteArray());
+                    } else if (schema.getType().equals(Schema.Type.FIXED)) {
+                        return new GenericData.Fixed(schema, ((BArray) data).getByteArray());
+                    } else if (schema.getType().equals(Schema.Type.ARRAY)) {
+                        return visitArray((BArray) data, schema);
+                    }
+                }
                 return visitArray((BArray) data, field.schema());
             }
             case MAP_TYPE -> {
                 return visitMap((BMap<?, ?>) data, field.schema());
             }
             case RECORD_TYPE -> {
-                return visitRecord((BMap<?, ?>) data, checkType(Schema.Type.RECORD, field.schema().getTypes()));
+                return visitRecord((BMap<?, ?>) data, getRecordSchema(Schema.Type.RECORD, field.schema().getTypes()));
             }
             case INTEGER_TYPE -> {
                 for (Schema schema : field.schema().getTypes()) {
@@ -248,9 +321,28 @@ public class SerializeVisitor implements ISerializeVisitor {
                 }
                 return data;
             }
+            case FLOAT_TYPE -> {
+                for (Schema schema: field.schema().getTypes()) {
+                    if (schema.getType().equals(Schema.Type.FLOAT)) {
+                        return ((Double) data).floatValue();
+                    }
+                }
+                return data;
+            }
             default -> {
                 return data;
             }
         }
+    }
+
+    public static Schema getRecordSchema(Schema.Type givenType, List<Schema> schemas) {
+        for (Schema schema: schemas) {
+            if (schema.getType().equals(Schema.Type.UNION)) {
+                getRecordSchema(givenType, schema.getTypes());
+            } else if (schema.getType().equals(givenType)) {
+                return schema;
+            }
+        }
+        return null;
     }
 }
