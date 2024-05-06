@@ -25,9 +25,6 @@ import io.ballerina.lib.avro.serialize.Serializer;
 import io.ballerina.lib.avro.visitor.DeserializeVisitor;
 import io.ballerina.lib.avro.visitor.SerializeVisitor;
 import io.ballerina.runtime.api.creators.ValueCreator;
-import io.ballerina.runtime.api.types.IntersectionType;
-import io.ballerina.runtime.api.types.Type;
-import io.ballerina.runtime.api.utils.TypeUtils;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
@@ -63,7 +60,9 @@ public final class Avro {
     public static Object toAvro(BObject schemaObject, Object data) {
         Schema schema = (Schema) schemaObject.getNativeData(AVRO_SCHEMA);
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            Object avroData = convertToAvroData(data, schema);
+            SerializeVisitor serializeVisitor = new SerializeVisitor();
+            Serializer serializer = MessageFactory.createMessage(schema);
+            Object avroData = Objects.requireNonNull(serializer).generateMessage(serializeVisitor, data);
             DatumWriter<Object> writer = new GenericDatumWriter<>(schema);
             BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
             writer.write(avroData, encoder);
@@ -75,12 +74,6 @@ public final class Avro {
         }
     }
 
-    private static Object convertToAvroData(Object data, Schema schema) throws Exception {
-        SerializeVisitor serializeVisitor = new SerializeVisitor();
-        Serializer serializer = MessageFactory.createMessage(schema);
-        return Objects.requireNonNull(serializer).generateMessage(serializeVisitor, data);
-    }
-
     public static Object fromAvro(BObject schemaObject, BArray payload, BTypedesc typeParam) {
         Schema schema = (Schema) schemaObject.getNativeData(AVRO_SCHEMA);
         DatumReader<Object> datumReader = new GenericDatumReader<>(schema);
@@ -89,19 +82,9 @@ public final class Avro {
             Object data = datumReader.read(payload, decoder);
             DeserializeVisitor deserializeVisitor = new DeserializeVisitor();
             Deserializer deserializer = DeserializeFactory.generateDeserializer(schema, typeParam.getDescribingType());
-            return Objects.requireNonNull(deserializer).fromAvroMessage(deserializeVisitor, data);
+            return Objects.requireNonNull(deserializer).fromAvroMessage(deserializeVisitor, data, schema);
         } catch (Exception e) {
             return createError(DESERIALIZATION_ERROR, e);
         }
-    }
-
-    public static Type getMutableType(IntersectionType intersectionType) {
-        for (Type type : intersectionType.getConstituentTypes()) {
-            Type referredType = TypeUtils.getImpliedType(type);
-            if (TypeUtils.getImpliedType(intersectionType.getEffectiveType()).getTag() == referredType.getTag()) {
-                return referredType;
-            }
-        }
-        throw new IllegalStateException("Unsupported intersection type found: " + intersectionType);
     }
 }
