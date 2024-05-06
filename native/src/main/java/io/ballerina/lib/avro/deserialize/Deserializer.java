@@ -51,5 +51,5 @@ public abstract class Deserializer {
         return type;
     }
 
-    public abstract Object fromAvroMessage(DeserializeVisitor visitor, Object data) throws Exception;
+    public abstract Object fromAvroMessage(DeserializeVisitor visitor, Object data, Schema schema) throws Exception;
 }
