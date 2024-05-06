@@ -32,7 +32,7 @@ public interface IDeserializeVisitor {
 
     public double visitDouble(Object data);
     public BString visitString(Object data);
-    BMap<BString, Object> visitMap(Map<String, Object> data, Type type) throws Exception;
+    BMap<BString, Object> visitMap(Map<String, Object> data, Type type, Schema schema) throws Exception;
     BArray visitFixed(Object data);
     Object visitArray(Schema schema, GenericData.Array<Object> data, Type type) throws Exception;
     BMap<BString, Object> visitRecords(Type type, Schema schema, GenericRecord rec) throws Exception;

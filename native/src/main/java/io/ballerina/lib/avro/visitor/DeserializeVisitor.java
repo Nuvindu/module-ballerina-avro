@@ -70,6 +70,43 @@ public class DeserializeVisitor implements IDeserializeVisitor {
         GenericData.Fixed fixed = (GenericData.Fixed) data;
         return ValueCreator.createArrayValue(fixed.bytes());
     }
+    @SuppressWarnings({"unchecked", "deprecation"})
+    public BMap<BString, Object> visitMap(Map<String, Object> data, Type type, Schema schema) throws Exception {
+        assert type instanceof MapType;
+        BMap<BString, Object> avroRecord = ValueCreator.createMapValue(type);
+        Object[] keys = data.keySet().toArray();
+        for (Object key : keys) {
+            Object value = data.get(key);
+            Schema.Type valueType = schema.getValueType().getType();
+            switch (valueType) {
+                case ARRAY ->
+                        avroRecord.put(StringUtils.fromString(key.toString()), visitArray(schema.getValueType(),
+                                       (GenericData.Array<Object>) value, ((MapType) type).getConstrainedType()));
+                case BYTES ->
+                        avroRecord.put(StringUtils.fromString(key.toString()),
+                                       ValueCreator.createArrayValue(((ByteBuffer) value).array()));
+                case FIXED ->
+                        avroRecord.put(StringUtils.fromString(key.toString()),
+                                       ValueCreator.createArrayValue(((GenericFixed) value).bytes()));
+                case RECORD ->
+                        avroRecord.put(StringUtils.fromString(key.toString()),
+                                       visitRecords(((MapType) type).getConstrainedType().getCachedReferredType(),
+                                                    schema.getValueType(), (GenericRecord) value));
+                case ENUM, STRING ->
+                        avroRecord.put(StringUtils.fromString(key.toString()),
+                                       StringUtils.fromString(value.toString()));
+                case FLOAT ->
+                        avroRecord.put(StringUtils.fromString(key.toString()), Double.parseDouble(value.toString()));
+                case MAP ->
+                        avroRecord.put(StringUtils.fromString(key.toString()),
+                                       visitMap((Map<String, Object>) value,
+                                                ((MapType) type).getConstrainedType(), schema.getValueType()));
+                default ->
+                        avroRecord.put(StringUtils.fromString(key.toString()), value);
+            }
+        }
+        return avroRecord;
+    }
 
     public Object visitArray(Schema schema, GenericData.Array<Object> data, Type type) throws Exception {
         switch (schema.getElementType().getType()) {
