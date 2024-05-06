@@ -32,44 +32,40 @@ import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BString;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericEnumSymbol;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
-import static io.ballerina.lib.avro.Avro.getMutableType;
+import static io.ballerina.lib.avro.Utils.getMutableType;
 
 public class DeserializeVisitor implements IDeserializeVisitor {
 
     public double visitDouble(Object data) {
         if (data instanceof Float) {
-            return ((Float) data).doubleValue();
+            return Double.parseDouble(data.toString());
         }
         return (double) data;
     }
 
-    public BString visitString(Object data) {
-        return StringUtils.fromString(data.toString());
-    }
-
-    public BMap<BString, Object> visitMap(Map<String, Object> data, Type type) throws Exception {
-        if (type instanceof MapType mapType) {
-            BMap<BString, Object> avroRecord = ValueCreator.createMapValue(mapType);
-            Object[] keys = data.keySet().toArray();
-            for (Object key : keys) {
-                avroRecord.put(StringUtils.fromString(key.toString()), data.get(key));
-            }
-            return avroRecord;
-        } else {
-            throw new Exception("Type is not a valid map type");
-        }
+    public BArray visitBytes(Object data) {
+        return ValueCreator.createArrayValue(((ByteBuffer) data).array());
     }
 
     public BArray visitFixed(Object data) {
         GenericData.Fixed fixed = (GenericData.Fixed) data;
         return ValueCreator.createArrayValue(fixed.bytes());
     }
+
+    public BString visitString(Object data) {
+        return StringUtils.fromString(data.toString());
+    }
+
     @SuppressWarnings({"unchecked", "deprecation"})
     public BMap<BString, Object> visitMap(Map<String, Object> data, Type type, Schema schema) throws Exception {
         assert type instanceof MapType;
@@ -110,60 +106,125 @@ public class DeserializeVisitor implements IDeserializeVisitor {
 
     public Object visitArray(Schema schema, GenericData.Array<Object> data, Type type) throws Exception {
         switch (schema.getElementType().getType()) {
-            case STRING -> {
-                BString[] stringArray = new BString[data.size()];
+            case ARRAY -> {
+                Object[] objects = new Object[data.size()];
+                Type arrayType = ((ArrayType) type).getElementType();
                 for (int i = 0; i < data.size(); i++) {
-                    stringArray[i] = StringUtils.fromString(data.get(i).toString());
+                    objects[i] = visitArray(schema.getElementType(),
+                                            (GenericData.Array<Object>) data.get(i), arrayType);
                 }
-                return ValueCreator.createArrayValue(stringArray);
+                return ValueCreator.createArrayValue(objects, (ArrayType) type);
             }
-            case INT, LONG -> {
-                long[] longArray = new long[data.size()];
+            case STRING -> {
+                return visitStringArray(data);
+            }
+            case ENUM -> {
+                Object[] enums = new Object[data.size()];
                 for (int i = 0; i < data.size(); i++) {
-                    longArray[i] = (long) data.get(i);
+                    enums[i] = visitString(data.get(i));
                 }
-                return ValueCreator.createArrayValue(longArray);
+                return ValueCreator.createArrayValue(enums, (ArrayType) type);
+            }
+            case INT -> {
+                return visitIntArray(data);
+            }
+            case LONG -> {
+                return visitLongArray(data);
             }
             case FLOAT, DOUBLE -> {
-                double[] floatArray = new double[data.size()];
-                for (int i = 0; i < data.size(); i++) {
-                    floatArray[i] = Double.parseDouble(data.get(i).toString());
-                }
-                return ValueCreator.createArrayValue(floatArray);
-
+                return visitDoubleArray(data);
             }
             case BOOLEAN -> {
-                boolean[] booleanArray = new boolean[data.size()];
-                for (int i = 0; i < data.size(); i++) {
-                    booleanArray[i] = (boolean) data.get(i);
-                }
-                return ValueCreator.createArrayValue(booleanArray);
+                return visitBooleanArray(data);
             }
             case RECORD -> {
-                Object[] recordArray = new Object[data.size()];
-                for (int i = 0; i < data.size(); i++) {
-                    if (type instanceof ArrayType arrayType) {
-                        recordArray[i] = visitRecords((arrayType.getElementType()).getCachedReferredType(),
-                                                      schema.getElementType(), (GenericRecord) data.get(i));
-                    }
-                }
-                assert type instanceof ArrayType;
-                return ValueCreator.createArrayValue(recordArray, (ArrayType) type);
+                return visitRecordArray(schema, data, type);
             }
-            case BYTES -> {
-                BArray[] values = new BArray[data.size()];
-                for (int i = 0; i < data.size(); i++) {
-                    ByteBuffer byteBuffer = (ByteBuffer) data.get(i);
-                    values[i] = ValueCreator.createArrayValue(byteBuffer.array());
-                }
-                return ValueCreator.createArrayValue(values, (ArrayType) type);
+            case FIXED -> {
+                assert type instanceof ArrayType;
+                return visitFixedArray(data, (ArrayType) type);
             }
             default -> {
-                return new int[]{};
+                assert type instanceof ArrayType;
+                return visitBytesArray(data, (ArrayType) type);
             }
         }
     }
 
+    private BArray visitBytesArray(GenericData.Array<Object> data, ArrayType type) {
+        List<BArray> values = new ArrayList<>();
+        for (Object datum : data) {
+            values.add(visitBytes(datum));
+        }
+        return ValueCreator.createArrayValue(values.toArray(new BArray[data.size()]), type);
+    }
+
+    private BArray visitFixedArray(GenericData.Array<Object> data, ArrayType type) {
+        List<BArray> values = new ArrayList<>();
+        for (Object datum : data) {
+            values.add(visitFixed(datum));
+        }
+        return ValueCreator.createArrayValue(values.toArray(new BArray[data.size()]), type);
+    }
+
+    private BArray visitRecordArray(Schema schema, GenericData.Array<Object> data, Type type) throws Exception {
+        List<Object> recordList = new ArrayList<>();
+        if (type instanceof ArrayType arrayType) {
+            for (Object datum : data) {
+                recordList.add(visitRecords(arrayType.getElementType().getCachedReferredType(),
+                               schema.getElementType(), (GenericRecord) datum));
+            }
+        }
+        assert type instanceof ArrayType;
+        return ValueCreator.createArrayValue(recordList.toArray(new Object[data.size()]), (ArrayType) type);
+
+    }
+
+    private static BArray visitBooleanArray(GenericData.Array<Object> data) {
+        boolean[] booleanArray = new boolean[data.size()];
+        int index = 0;
+        for (Object datum : data) {
+            booleanArray[index++] = (boolean) datum;
+        }
+        return ValueCreator.createArrayValue(booleanArray);
+    }
+
+    private BArray visitDoubleArray(GenericData.Array<Object> data) {
+        List<Double> doubleList = new ArrayList<>();
+        for (Object datum : data) {
+            doubleList.add(visitDouble(datum));
+        }
+        double[] doubleArray = doubleList.stream().mapToDouble(Double::doubleValue).toArray();
+        return ValueCreator.createArrayValue(doubleArray);
+    }
+
+    private static BArray visitLongArray(GenericData.Array<Object> data) {
+        List<Long> longList = new ArrayList<>();
+        for (Object datum : data) {
+            longList.add((Long) datum);
+        }
+        long[] longArray = longList.stream().mapToLong(Long::longValue).toArray();
+        return ValueCreator.createArrayValue(longArray);
+    }
+
+    private static BArray visitIntArray(GenericData.Array<Object> data) {
+        List<Long> longList = new ArrayList<>();
+        for (Object datum : data) {
+            longList.add(((Integer) datum).longValue());
+        }
+        long[] longArray = longList.stream().mapToLong(Long::longValue).toArray();
+        return ValueCreator.createArrayValue(longArray);
+    }
+
+    private BArray visitStringArray(GenericData.Array<Object> data) {
+        BString[] stringArray = new BString[data.size()];
+        for (int i = 0; i < data.size(); i++) {
+            stringArray[i] = visitString(data.get(i));
+        }
+        return ValueCreator.createArrayValue(stringArray);
+    }
+
+    @SuppressWarnings("unchecked")
     public BMap<BString, Object> visitRecords(Type type, Schema schema, GenericRecord rec) throws Exception {
         BMap<BString, Object> avroRecord;
         Type originalType = type;
@@ -178,40 +239,35 @@ public class DeserializeVisitor implements IDeserializeVisitor {
         for (Schema.Field field : schema.getFields()) {
             Object fieldData = rec.get(field.name());
             switch (field.schema().getType()) {
-                case MAP:
+                case MAP -> {
                     Type mapType = extractMapType(type);
                     avroRecord.put(StringUtils.fromString(field.name()),
-                                   visitMap((Map<String, Object>) rec.get(field.name()), mapType));
-                    break;
-                case ARRAY:
-                    avroRecord.put(StringUtils.fromString(field.name()), visitArray(field.schema(),
-                                   (GenericData.Array<Object>) rec.get(field.name()), type));
-                    break;
-                case BYTES:
+                                   visitMap((Map<String, Object>) rec.get(field.name()), mapType, field.schema()));
+                }
+                case ARRAY ->
+                        avroRecord.put(StringUtils.fromString(field.name()), visitArray(field.schema(),
+                                       (GenericData.Array<Object>) rec.get(field.name()), type));
+                case BYTES -> {
                     ByteBuffer byteBuffer = (ByteBuffer) rec.get(field.name());
                     avroRecord.put(StringUtils.fromString(field.name()),
                                    ValueCreator.createArrayValue(byteBuffer.array()));
-                    break;
-                case STRING:
-                    avroRecord.put(StringUtils.fromString(field.name()),
-                                   StringUtils.fromString(rec.get(field.name()).toString()));
-                    break;
-                case RECORD:
+                }
+                case STRING ->
+                        avroRecord.put(StringUtils.fromString(field.name()),
+                                       StringUtils.fromString(rec.get(field.name()).toString()));
+                case RECORD -> {
                     Type recType = extractRecordType((RecordType) type);
                     avroRecord.put(StringUtils.fromString(field.name()),
-                                   visitRecords(recType, field.schema(), (GenericRecord) rec.get(field.name())));
-                    break;
-                case INT:
-                    avroRecord.put(StringUtils.fromString(field.name()), Long.parseLong(fieldData.toString()));
-                    break;
-                case FLOAT:
-                    avroRecord.put(StringUtils.fromString(field.name()), Double.parseDouble(fieldData.toString()));
-                    break;
-                case UNION:
-                    visitUnionRecords(type, avroRecord, field, fieldData);
-                    break;
-                default:
-                    avroRecord.put(StringUtils.fromString(field.name()), rec.get(field.name()));
+                            visitRecords(recType, field.schema(), (GenericRecord) rec.get(field.name())));
+                }
+                case INT ->
+                        avroRecord.put(StringUtils.fromString(field.name()), Long.parseLong(fieldData.toString()));
+                case FLOAT ->
+                        avroRecord.put(StringUtils.fromString(field.name()), Double.parseDouble(fieldData.toString()));
+                case UNION ->
+                        visitUnionRecords(type, avroRecord, field, fieldData);
+                default ->
+                        avroRecord.put(StringUtils.fromString(field.name()), rec.get(field.name()));
             }
         }
         if (originalType.isReadOnly()) {
@@ -220,6 +276,7 @@ public class DeserializeVisitor implements IDeserializeVisitor {
         return avroRecord;
     }
 
+    @SuppressWarnings("unchecked")
     private void visitUnionRecords(Type type, BMap<BString, Object> avroRecord,
                                    Schema.Field field, Object fieldData) throws Exception {
         for (Schema schemaType : field.schema().getTypes()) {
@@ -228,6 +285,47 @@ public class DeserializeVisitor implements IDeserializeVisitor {
                 break;
             }
             switch (schemaType.getType()) {
+                case BYTES -> {
+                    if (fieldData instanceof ByteBuffer) {
+                        BArray byteArray = ValueCreator.createArrayValue(((ByteBuffer) fieldData).array());
+                        avroRecord.put(StringUtils.fromString(field.name()), byteArray);
+                    }
+                }
+                case FIXED -> {
+                    if (fieldData instanceof GenericFixed) {
+                        BArray byteArray = ValueCreator.createArrayValue(((GenericData.Fixed) fieldData).bytes());
+                        avroRecord.put(StringUtils.fromString(field.name()), byteArray);
+                    }
+                }
+                case ARRAY -> {
+                    if (fieldData instanceof GenericData.Array<?>) {
+                        Object[] objectArray = ((GenericData.Array<?>) fieldData).toArray();
+                        if (schemaType.getElementType().getType().equals(Schema.Type.STRING)
+                                || schemaType.getElementType().getType().equals(Schema.Type.ENUM)) {
+                            BString[] stringArray = new BString[objectArray.length];
+                            BArray ballerinaArray = ValueCreator.createArrayValue(stringArray);
+                            int i = 0;
+                            for (Object obj : objectArray) {
+                                stringArray[i] = StringUtils.fromString(obj.toString());
+                                i++;
+                            }
+                            avroRecord.put(StringUtils.fromString(field.name()), ballerinaArray);
+                        } else {
+                            avroRecord.put(StringUtils.fromString(field.name()), fieldData);
+                        }
+                    }
+                }
+                case MAP -> {
+                    if (fieldData instanceof Map<?, ?>) {
+                        BMap<BString, Object> avroMap = ValueCreator.createMapValue();
+                        Object[] keys = ((Map<String, Object>) fieldData).keySet().toArray();
+                        for (Object key : keys) {
+                            avroMap.put(StringUtils.fromString(key.toString()),
+                                    ((Map<String, Object>) fieldData).get(key));
+                        }
+                        avroRecord.put(StringUtils.fromString(field.name()), avroMap);
+                    }
+                }
                 case RECORD -> {
                     if (fieldData instanceof GenericRecord) {
                         avroRecord.put(StringUtils.fromString(field.name()),
@@ -249,6 +347,14 @@ public class DeserializeVisitor implements IDeserializeVisitor {
                 case FLOAT, DOUBLE -> {
                     if (fieldData instanceof Double) {
                         avroRecord.put(StringUtils.fromString(field.name()), fieldData);
+                    } else {
+                        avroRecord.put(StringUtils.fromString(field.name()), Double.parseDouble(fieldData.toString()));
+                    }
+                }
+                case ENUM -> {
+                    if (fieldData instanceof GenericEnumSymbol<?>) {
+                        avroRecord.put(StringUtils.fromString(field.name()),
+                                       StringUtils.fromString(fieldData.toString()));
                     }
                 }
                 default -> {
@@ -271,9 +377,9 @@ public class DeserializeVisitor implements IDeserializeVisitor {
                 } else if (TypeUtils.getReferredType(fieldType) instanceof MapType) {
                     mapType = TypeUtils.getReferredType(fieldType);
                 } else if (fieldType instanceof IntersectionType) {
-                    Type getType = getMutableType((IntersectionType) fieldType);
-                    if (getType instanceof MapType) {
-                        mapType = getType;
+                    Type referredType = getMutableType((IntersectionType) fieldType);
+                    if (referredType instanceof MapType) {
+                        mapType = referredType;
                     }
                 }
             }
